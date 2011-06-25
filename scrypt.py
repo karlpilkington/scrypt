@@ -59,6 +59,6 @@ def scrypt(password, salt, N, r, p, dkLen):
 
 if __name__ == '__main__':
     print(scrypt('', '', 16, 1, 1, 64).encode('hex'))
-    #print(scrypt('password', 'NaCl', 1024, 8, 16, 64).encode('hex'))
+    print(scrypt('password', 'NaCl', 1024, 8, 16, 64).encode('hex'))
     import timeit
     print(timeit.Timer("""scrypt('password', 'salt', 64, 8, 1, 64)""", 'from __main__ import scrypt').timeit(10))
