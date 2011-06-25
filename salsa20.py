@@ -45,23 +45,10 @@ def doubleround(x):
     x[15] ^= rotl(x[14]+x[13],18)
 
 
-def littleendian(b):
-    return b[0] | (b[1] << 8) | (b[2] << 16) | (b[3] << 24)
-
-
-def littleendian_inv(w):
-    return [w & 0xff,
-            (w >> 8) & 0xff,
-            (w >> 16) & 0xff,
-            (w >> 24) & 0xff]
-
-
 def salsa20core(x, rounds=20):
-    x = [littleendian(x[i:i+4]) for i in range(0,len(x),4)]
     z = list(x)
     for i in range(rounds/2):
         doubleround(z)
-    out = []
-    for xi,zi in izip(x, z):
-        out.extend(littleendian_inv(xi + zi))
-    return out
+    for i in range(16):
+        z[i] = (z[i] + x[i]) & MASK32
+    return z

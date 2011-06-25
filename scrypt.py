@@ -8,41 +8,55 @@ from pbkdf2 import PBKDF2
 
 __all__ = ['scrypt']
 
+BLOCK_WORDS = 16
+
 
 def blockmix_salsa20_8(B, r=8):
-    X = B[2 * r - 1]
-    Y = []
-    for b in B:
-        t = []
-        for x,bi in izip(X, b):
-            t.append(x ^ bi)
-        X = salsa20core(t, rounds=8)
-        Y.append(X)
-    return Y[0:2 * r:2] + Y[1:2 * r:2]
+    Y = [None]*(2 * r * BLOCK_WORDS)
+    even = 0
+    odd = r * BLOCK_WORDS
+    T = B[(2 * r - 1) * BLOCK_WORDS:]
+
+    for i in range(0,2 * r * BLOCK_WORDS,2 * BLOCK_WORDS):
+        for j in range(BLOCK_WORDS):
+            T[j] ^= B[i + j]
+        Y[even:even+BLOCK_WORDS] = T = salsa20core(T, rounds=8)
+        even += BLOCK_WORDS
+        
+        for j in range(BLOCK_WORDS):
+            T[j] ^= B[i + BLOCK_WORDS + j]
+        Y[odd:odd+BLOCK_WORDS] = T = salsa20core(T, rounds=8)
+        odd += BLOCK_WORDS
+    return Y
+
+
+def littleendian(b):
+    return ord(b[0]) | (ord(b[1]) << 8) | (ord(b[2]) << 16) | (ord(b[3]) << 24)
+
+
+def littleendian_inv(w):
+    return [chr(w & 0xff),
+            chr((w >> 8) & 0xff),
+            chr((w >> 16) & 0xff),
+            chr((w >> 24) & 0xff)]
 
 
 def smix(B, N, r=8):
-    X = []
-    while B:
-        X.append([ord(c) for c in B[:64]])
-        B = B[64:]
+    X = [littleendian(B[i:i+4]) for i in range(0,len(B),4)]
     V = []
     for i in range(N):
         V.append(X)
         X = blockmix_salsa20_8(X, r=r)
     for i in range(N):
-        Blast = X[-1]
-        j = Blast[0] | (Blast[1] << 8) | (Blast[2] << 16) | (Blast[3] << 24)
-        j %= N
+        j = X[-BLOCK_WORDS] % N
 
-        tk = []
-        for k in range(2 * r):
-            t = []
-            for xk,vjk in izip(X[k], V[j][k]):
-                t.append(xk ^ vjk)
-            tk.append(t)
-        X = blockmix_salsa20_8(tk, r=r)
-    return ''.join([''.join([chr(c) for c in x]) for x in X])
+        for k in range(2 * r * BLOCK_WORDS):
+            X[k] ^= V[j][k]
+        X = blockmix_salsa20_8(X, r=r)
+    out = []
+    for x in X:
+        out.extend(littleendian_inv(x))
+    return ''.join(out)
 
 
 def scrypt(password, salt, N, r, p, dkLen):
@@ -59,6 +73,6 @@ def scrypt(password, salt, N, r, p, dkLen):
 
 if __name__ == '__main__':
     print(scrypt('', '', 16, 1, 1, 64).encode('hex'))
-    print(scrypt('password', 'NaCl', 1024, 8, 16, 64).encode('hex'))
+    #print(scrypt('password', 'NaCl', 1024, 8, 16, 64).encode('hex'))
     import timeit
     print(timeit.Timer("""scrypt('password', 'salt', 64, 8, 1, 64)""", 'from __main__ import scrypt').timeit(10))
