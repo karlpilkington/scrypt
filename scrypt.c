@@ -225,5 +225,17 @@ main (int argc, char *argv[])
   scrypt("", 0, "", 0, 16, 1, 1, out, sizeof(out));
   print_hex(out, sizeof(out));
 
+  printf("scrypt:\n");
+  scrypt("password", 8, "NaCl", 4, 1024, 8, 16, out, sizeof(out));
+  print_hex(out, sizeof(out));
+
+  printf("scrypt:\n");
+  scrypt("pleaseletmein", 13, "SodiumChloride", 14, 16384, 8, 1, out, sizeof(out));
+  print_hex(out, sizeof(out));
+
+  printf("scrypt:\n");
+  scrypt("pleaseletmein", 13, "SodiumChloride", 14, 1048576, 8, 1, out, sizeof(out));
+  print_hex(out, sizeof(out));
+
   return 0;
 }
