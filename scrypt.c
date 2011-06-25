@@ -1,4 +1,15 @@
-#include <inttypes.h>
+#ifdef HAVE_CONFIG_H
+#include <config.h>
+#endif /* HAVE_CONFIG_H */
+
+#if HAVE_INTTYPES_H
+# include <inttypes.h>
+#else
+# if HAVE_STDINT_H
+#  include <stdint.h>
+# endif
+#endif
+
 #include <stdlib.h>
 #include <string.h>
 
@@ -7,16 +18,8 @@
 #define ROTL(x, n) (((x) << (n)) | ((x) >> (32 - (n))))
 #define ROTR(x, n) (((x) >> (n)) | ((x) << (32 - (n))))
 
-#ifndef WORDS_BIGENDIAN
-
-#define BYTESWAP(x) (x)
-
-#else /* !WORDS_BIGENDIAN */
-
 #define BYTESWAP(x) ((ROTR((x), 8) & 0xff00ff00) | \
                      (ROTL((x), 8) & 0x00ff00ff))
-
-#endif /* !WORDS_BIGENDIAN */
 
 #define BLOCK_WORDS 16
 
@@ -116,7 +119,13 @@ smix (void *out, const void *in, int N, int r)
 
   memcpy(V, in, sizeof(*V) * 2 * r * BLOCK_WORDS);
 
-  /* TODO endian conversion */
+#ifdef WORDS_BIGENDIAN
+  v = V;
+  for (i = 2 * r * BLOCK_WORDS - 1; i >= 0; i--) {
+    *v = BYTESWAP(*v);
+    v++;
+  }
+#endif /* WORDS_BIGENDIAN */
 
   v = V;
   for (i = N - 1; i >= 0; i--) {
@@ -143,9 +152,15 @@ smix (void *out, const void *in, int N, int r)
     X = t;
   }
 
-  memcpy (out, X, sizeof(*X) * 2 * r * BLOCK_WORDS);
+#ifdef WORDS_BIGENDIAN
+  x = X;
+  for (i = 2 * r * BLOCK_WORDS - 1; i >= 0; i--) {
+    *x = BYTESWAP(*x);
+    x++;
+  }
+#endif /* WORDS_BIGENDIAN */
 
-  /* TODO endian conversion */
+  memcpy (out, X, sizeof(*X) * 2 * r * BLOCK_WORDS);
 
   free(V);
   return 0;
