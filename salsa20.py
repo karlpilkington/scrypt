@@ -43,11 +43,10 @@ def littleendian_inv(w):
             (w >> 24) & 0xff]
 
 def salsa20(x, rounds=20):
-    xin = [ord(c) for c in x]
     xwords = []
-    while xin:
-        xwords.append(littleendian(xin[:4]))
-        xin = xin[4:]
+    while x:
+        xwords.append(littleendian(x[:4]))
+        x = x[4:]
     z = xwords
     for i in range(rounds/2):
         z = doubleround(z)
@@ -55,5 +54,4 @@ def salsa20(x, rounds=20):
     for i in range(16):
         xword = (xwords[i] + z[i]) & MASK32
         out.extend(littleendian_inv(xword))
-    out = [chr(c) for c in out]
-    return ''.join(out)
+    return out

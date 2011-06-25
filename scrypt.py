@@ -5,12 +5,10 @@ def blockmix_salsa20_8(B, r=8):
     X = B[2 * r - 1]
     Y = []
     for i in range(2 * r):
-        X = [ord(c) for c in X]
-        Bi = [ord(c) for c in B[i]]
+        tj = []
         for j in range(64):
-            X[j] ^= Bi[j]
-        X = ''.join([chr(c) for c in X])
-        X = salsa20(X, rounds=8)
+            tj.append(X[j] ^ B[i][j])
+        X = salsa20(tj, rounds=8)
         Y.append(X)
     Bout = []
     for i in range(0, 2 * r, 2):
@@ -22,27 +20,25 @@ def blockmix_salsa20_8(B, r=8):
 def romix_blockmix_salsa20_8(B, N, r=8):
     X = []
     while B:
-        X.append(B[:64])
+        X.append([ord(c) for c in B[:64]])
         B = B[64:]
     V = []
     for i in range(N):
         V.append(X)
         X = blockmix_salsa20_8(X, r=r)
     for i in range(N):
-        Bm1 = [ord(c) for c in X[-1]]
+        Bm1 = X[-1]
         j = Bm1[0] | (Bm1[1] << 8) | (Bm1[2] << 16) | (Bm1[3] << 24)
         j %= N
 
-        Xt = []
+        tk = []
         for k in range(2 * r):
-            Xk = [ord(c) for c in X[k]]
-            Vj = [ord(c) for c in V[j][k]]
+            tl = []
             for l in range(64):
-                Xk[l] ^= Vj[l]
-            Xk = ''.join(chr(c) for c in Xk)
-            Xt.append(Xk)
-        X = blockmix_salsa20_8(Xt, r=r)
-    return ''.join(X)
+                tl.append(X[k][l] ^ V[j][k][l])
+            tk.append(tl)
+        X = blockmix_salsa20_8(tk, r=r)
+    return ''.join([''.join([chr(c) for c in x]) for x in X])
 
 def scrypt(password, salt, N, r, p, dkLen):
     MFLen = 2 * r * 64
@@ -58,4 +54,6 @@ def scrypt(password, salt, N, r, p, dkLen):
 
 if __name__ == '__main__':
     print(scrypt('', '', 16, 1, 1, 64).encode('hex'))
-    print(scrypt('password', 'NaCl', 1024, 8, 16, 64).encode('hex'))
+    #print(scrypt('password', 'NaCl', 1024, 8, 16, 64).encode('hex'))
+    import timeit
+    print(timeit.Timer("""scrypt('password', 'salt', 64, 8, 1, 64)""", 'from __main__ import scrypt').timeit(10))
