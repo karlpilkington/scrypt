@@ -2,7 +2,7 @@ import hashlib
 
 from itertools import izip
 
-from salsa20 import salsa20
+from salsa20 import salsa20core
 from pbkdf2 import PBKDF2
 
 
@@ -16,7 +16,7 @@ def blockmix_salsa20_8(B, r=8):
         t = []
         for x,bi in izip(X, b):
             t.append(x ^ bi)
-        X = salsa20(t, rounds=8)
+        X = salsa20core(t, rounds=8)
         Y.append(X)
     return Y[0:2 * r:2] + Y[1:2 * r:2]
 
