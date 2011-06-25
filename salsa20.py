@@ -1,10 +1,14 @@
-__all__ = ['salsa20']
+from itertools import izip
 
+
+__all__ = ['salsa20']
 
 MASK32 = 2**32-1
 
+
 def rotl(n, r):
     return ((n << r) & MASK32) | ((n & MASK32) >> (32 - r))
+
 
 def quarterround(y):
     z = [None]*4
@@ -14,6 +18,7 @@ def quarterround(y):
     z[0] = y[0] ^ rotl(z[3] + z[2], 18)
     return z
 
+
 def rowround(y):
     z = [None]*16
     z[ 0], z[ 1], z[ 2], z[ 3] = quarterround((y[ 0], y[ 1], y[ 2], y[ 3]))
@@ -21,6 +26,7 @@ def rowround(y):
     z[10], z[11], z[ 8], z[ 9] = quarterround((y[10], y[11], y[ 8], y[ 9]))
     z[15], z[12], z[13], z[14] = quarterround((y[15], y[12], y[13], y[14]))
     return z
+
 
 def columnround(x):
     y = [None]*16
@@ -30,11 +36,14 @@ def columnround(x):
     y[15], y[ 3], y[ 7], y[11] = quarterround((x[15], x[ 3], x[ 7], x[11]))
     return y
 
+
 def doubleround(x):
     return rowround(columnround(x))
 
+
 def littleendian(b):
     return b[0] | (b[1] << 8) | (b[2] << 16) | (b[3] << 24)
+
 
 def littleendian_inv(w):
     return [w & 0xff,
@@ -42,16 +51,13 @@ def littleendian_inv(w):
             (w >> 16) & 0xff,
             (w >> 24) & 0xff]
 
+
 def salsa20(x, rounds=20):
-    xwords = []
-    while x:
-        xwords.append(littleendian(x[:4]))
-        x = x[4:]
-    z = xwords
+    x = [littleendian(x[i:i+4]) for i in range(0,len(x),4)]
+    z = x
     for i in range(rounds/2):
         z = doubleround(z)
     out = []
-    for i in range(16):
-        xword = (xwords[i] + z[i]) & MASK32
-        out.extend(littleendian_inv(xword))
+    for xi,zi in izip(x, z):
+        out.extend(littleendian_inv(xi + zi))
     return out
