@@ -76,32 +76,35 @@ blockmix_salsa20_8_core (uint32_t *out, const uint32_t *in, int r)
 {
   uint32_t *even, *odd;
   uint32_t *x;
+  uint32_t tmp[BLOCK_WORDS];
   int i, j;
 
   even = out;
   odd = &out[r * BLOCK_WORDS];
 
-  memcpy(even, &in[2 * (r - 1) * BLOCK_WORDS], sizeof(*even) * BLOCK_WORDS);
+  memcpy(tmp, &in[(2 * r - 1) * BLOCK_WORDS], sizeof(tmp));
 
   for (i = r - 1; i >= 0; i--) {
-    x = even;
+    x = tmp;
     for (j = BLOCK_WORDS - 1; j >= 0; j--) {
-      *(even++) ^= *(in++);
+      *(x++) ^= *(in++);
     }
-    /* NB: even already at next block */
-    salsa20_8_core(odd, x);
+    salsa20_8_core(even, tmp);
+    memcpy(tmp, even, sizeof(tmp));
+    even += BLOCK_WORDS;
 
-    x = odd;
+    x = tmp;
     for (j = BLOCK_WORDS - 1; j >= 0; j--) {
-      *(odd++) ^= *(in++);
+      *(x++) ^= *(in++);
     }
-    /* NB: odd already at next block */
-    salsa20_8_core(even, x);
+    salsa20_8_core(odd, tmp);
+    memcpy(tmp, odd, sizeof(tmp));
+    odd += BLOCK_WORDS;
   }
 }
 
 static int
-smix (uint8_t *out, const uint8_t *in, int N, int r)
+smix (void *out, const void *in, int N, int r)
 {
   uint32_t *V, *v;
   uint32_t *X, *T, *x, *t;
@@ -124,7 +127,7 @@ smix (uint8_t *out, const uint8_t *in, int N, int r)
   T = &X[2 * r * BLOCK_WORDS];
 
   for (i = N - 1; i >= 0; i--) {
-    j = X[2 * (r - 1)] % N;
+    j = X[(2 * r - 1) * BLOCK_WORDS] % N;
 
     x = X;
     v = &V[2 * r * BLOCK_WORDS * j];
@@ -140,7 +143,7 @@ smix (uint8_t *out, const uint8_t *in, int N, int r)
     X = t;
   }
 
-  memcpy (out, X, sizeof(*out) * 2 * r * BLOCK_WORDS);
+  memcpy (out, X, sizeof(*X) * 2 * r * BLOCK_WORDS);
 
   /* TODO endian conversion */
 
@@ -195,8 +198,30 @@ print_hex (uint8_t *s, int len)
 int
 main (int argc, char *argv[])
 {
+  uint32_t salsain[BLOCK_WORDS], salsaout[BLOCK_WORDS];
+  uint32_t blockmixin[4 * BLOCK_WORDS], blockmixout[4 * BLOCK_WORDS];
+  uint32_t smixin[2 * BLOCK_WORDS], smixout[2 * BLOCK_WORDS];
   uint8_t out[64];
 
+  memset(salsain, 0, sizeof(salsain));
+  salsain[0] = 1;
+  salsa20_8_core(salsaout, salsain);
+  printf("salsa20_8_core:\n");
+  print_hex((uint8_t *)salsaout, sizeof(salsaout));
+
+  memset(blockmixin, 0, sizeof(blockmixin));
+  blockmixin[0] = 1;
+  blockmix_salsa20_8_core(blockmixout, blockmixin, 2);
+  printf("blockmix_salsa20_8_core:\n");
+  print_hex((uint8_t *)blockmixout, sizeof(blockmixout));
+
+  memset(smixin, 0, sizeof(smixin));
+  smixin[0] = 1;
+  smix(smixout, smixin, 1, 1);
+  printf("smix:\n");
+  print_hex((uint8_t *)smixout, sizeof(smixout));
+
+  printf("scrypt:\n");
   scrypt("", 0, "", 0, 16, 1, 1, out, sizeof(out));
   print_hex(out, sizeof(out));
 
