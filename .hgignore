@@ -4,3 +4,8 @@ syntax: glob
 *.pyo
 *.o
 test
+CMakeCache.txt
+CMakeFiles
+cmake_install.cmake
+Makefile
+config.h
