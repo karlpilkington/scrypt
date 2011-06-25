@@ -1,6 +1,3 @@
-from itertools import izip
-
-
 __all__ = ['salsa20core']
 
 MASK32 = 2**32-1

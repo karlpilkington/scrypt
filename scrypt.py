@@ -30,11 +30,11 @@ def blockmix_salsa20_8(B, r=8):
     return Y
 
 
-def littleendian(b):
+def from_littleendian(b):
     return ord(b[0]) | (ord(b[1]) << 8) | (ord(b[2]) << 16) | (ord(b[3]) << 24)
 
 
-def littleendian_inv(w):
+def to_littleendian(w):
     return [chr(w & 0xff),
             chr((w >> 8) & 0xff),
             chr((w >> 16) & 0xff),
@@ -42,7 +42,7 @@ def littleendian_inv(w):
 
 
 def smix(B, N, r=8):
-    X = [littleendian(B[i:i+4]) for i in range(0,len(B),4)]
+    X = [from_littleendian(B[i:i+4]) for i in range(0,len(B),4)]
     V = []
     for i in range(N):
         V.append(X)
@@ -50,12 +50,13 @@ def smix(B, N, r=8):
     for i in range(N):
         j = X[-BLOCK_WORDS] % N
 
-        for k in range(2 * r * BLOCK_WORDS):
-            X[k] ^= V[j][k]
-        X = blockmix_salsa20_8(X, r=r)
+        T = []
+        for xk,vjk in izip(X, V[j]):
+            T.append(xk ^ vjk)
+        X = blockmix_salsa20_8(T, r=r)
     out = []
     for x in X:
-        out.extend(littleendian_inv(x))
+        out.extend(to_littleendian(x))
     return ''.join(out)
 
 
