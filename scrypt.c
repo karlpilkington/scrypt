@@ -90,21 +90,21 @@ salsa20_8_core (uint32_t out[BLOCK_WORDS], const uint32_t in[BLOCK_WORDS])
 
 static void
 blockmix_salsa20_8_core (uint32_t out[/* (2 * r * BLOCK_WORDS) */],
-			 const uint32_t in[/* (2 * r * BLOCK_WORDS) */], int r)
+			 const uint32_t in[/* (2 * r * BLOCK_WORDS) */], unsigned int r)
 {
   uint32_t *even, *odd;
   uint32_t *x;
   uint32_t tmp[BLOCK_WORDS];
-  int i, j;
+  unsigned int i, j;
 
   even = out;
   odd = &out[r * BLOCK_WORDS];
 
   memcpy(tmp, &in[(2 * r - 1) * BLOCK_WORDS], sizeof(tmp));
 
-  for (i = r - 1; i >= 0; i--) {
+  for (i = r; i > 0; i--) {
     x = tmp;
-    for (j = BLOCK_WORDS - 1; j >= 0; j--) {
+    for (j = BLOCK_WORDS; j > 0; j--) {
       *(x++) ^= *(in++);
     }
     salsa20_8_core(even, tmp);
@@ -112,7 +112,7 @@ blockmix_salsa20_8_core (uint32_t out[/* (2 * r * BLOCK_WORDS) */],
     even += BLOCK_WORDS;
 
     x = tmp;
-    for (j = BLOCK_WORDS - 1; j >= 0; j--) {
+    for (j = BLOCK_WORDS; j > 0; j--) {
       *(x++) ^= *(in++);
     }
     salsa20_8_core(odd, tmp);
@@ -123,38 +123,38 @@ blockmix_salsa20_8_core (uint32_t out[/* (2 * r * BLOCK_WORDS) */],
 
 static void
 smix (void *out /* (sizeof(uint32_t) * 2 * r * BLOCK_WORDS) */,
-      const void *in /* (sizeof(uint32_t) * 2 * r * BLOCK_WORDS) */, int N, int r,
+      const void *in /* (sizeof(uint32_t) * 2 * r * BLOCK_WORDS) */, unsigned int N, unsigned int r,
       uint32_t tmp[/* (2 * r * BLOCK_WORDS * (N + 2)) */])
 {
   uint32_t *v;
   uint32_t *X, *T, *x, *t;
   uint32_t j;
-  int i, k;
+  unsigned int i, k;
 
   memcpy(tmp, in, sizeof(*tmp) * 2 * r * BLOCK_WORDS);
 
 #ifdef WORDS_BIGENDIAN
   v = tmp;
-  for (i = 2 * r * BLOCK_WORDS - 1; i >= 0; i--) {
+  for (i = 2 * r * BLOCK_WORDS; i > 0; i--) {
     *v = BYTESWAP(*v);
     v++;
   }
 #endif /* WORDS_BIGENDIAN */
 
   v = tmp;
-  for (i = N - 1; i >= 0; i--) {
+  for (i = N; i > 0; i--) {
     blockmix_salsa20_8_core(v + 2 * r * BLOCK_WORDS, v, r);
     v += 2 * r * BLOCK_WORDS;
   }
   X = v;
   T = &X[2 * r * BLOCK_WORDS];
 
-  for (i = N - 1; i >= 0; i--) {
+  for (i = N; i > 0; i--) {
     j = X[(2 * r - 1) * BLOCK_WORDS] % N;
 
     x = X;
     v = &tmp[2 * r * BLOCK_WORDS * j];
-    for (k = 2 * r * BLOCK_WORDS - 1; k >= 0; k--) {
+    for (k = 2 * r * BLOCK_WORDS; k > 0; k--) {
       *(x++) ^= *(v++);
     }
 
@@ -168,7 +168,7 @@ smix (void *out /* (sizeof(uint32_t) * 2 * r * BLOCK_WORDS) */,
 
 #ifdef WORDS_BIGENDIAN
   x = X;
-  for (i = 2 * r * BLOCK_WORDS - 1; i >= 0; i--) {
+  for (i = 2 * r * BLOCK_WORDS; i > 0; i--) {
     *x = BYTESWAP(*x);
     x++;
   }
@@ -178,13 +178,14 @@ smix (void *out /* (sizeof(uint32_t) * 2 * r * BLOCK_WORDS) */,
 }
 
 int
-scrypt (const void *password, size_t passwordLen, const void *salt, size_t saltLen, int N, int r, int p,
+scrypt (const void *password, size_t passwordLen, const void *salt, size_t saltLen,
+	unsigned int N, unsigned int r, unsigned int p,
 	uint8_t *derivedKey, size_t dkLen)
 {
-  int MFLen = sizeof(uint32_t) * 2 * r * BLOCK_WORDS;
+  size_t MFLen = sizeof(uint32_t) * 2 * r * BLOCK_WORDS;
   uint8_t *B, *b;
   uint32_t *tmp;
-  int i;
+  unsigned int i;
 
   if ((B = malloc(p * MFLen)) == NULL)
     return -1;
@@ -197,7 +198,7 @@ scrypt (const void *password, size_t passwordLen, const void *salt, size_t saltL
   }
 
   b = B;
-  for (i = p - 1; i >= 0; i--) {
+  for (i = p; i > 0; i--) {
     smix(b, b, N, r, tmp);
     b += MFLen;
   }

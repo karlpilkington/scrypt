@@ -13,7 +13,8 @@
 # endif
 #endif
 
-int scrypt (const void *password, size_t passwordLen, const void *salt, size_t saltLen, int N, int r, int p,
+int scrypt (const void *password, size_t passwordLen, const void *salt, size_t saltLen,
+	    unsigned int N, unsigned int r, unsigned int p,
 	    uint8_t *derivedKey, size_t dkLen);
 
 #endif /* !_APS_SCRYPT_H */
