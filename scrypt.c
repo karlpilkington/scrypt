@@ -13,6 +13,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "scrypt.h"
 #include "pbkdf2-sha256.h"
 
 #define ROTL(x, n) (((x) << (n)) | ((x) >> (32 - (n))))
@@ -195,6 +196,8 @@ scrypt (const void *password, size_t passwordLen, const void *salt, size_t saltL
   return success;
 }
 
+#ifdef SCRYPT_TEST
+
 #include <stdio.h>
 
 static void
@@ -254,3 +257,4 @@ main (int argc, char *argv[])
 
   return 0;
 }
+#endif /* SCRYPT_TEST */

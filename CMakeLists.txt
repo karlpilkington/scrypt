@@ -16,6 +16,6 @@ configure_file (
 	)
 
 include_directories ("${PROJECT_BINARY_DIR}")
-add_definitions (-DHAVE_CONFIG_H)
+add_definitions (-DHAVE_CONFIG_H -DSCRYPT_TEST)
 
 add_executable (test scrypt.c pbkdf2-sha256.c hmac-sha256.c sha256.c)
