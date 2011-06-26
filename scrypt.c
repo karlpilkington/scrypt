@@ -190,7 +190,8 @@ scrypt (const void *password, size_t passwordLen, const void *salt, size_t saltL
   if ((B = malloc(p * MFLen)) == NULL)
     return -1;
 
-  PBKDF2_SHA256(password, passwordLen, salt, saltLen, 1, B, p * MFLen);
+  if (PBKDF2_SHA256(password, passwordLen, salt, saltLen, 1, B, p * MFLen))
+    return -1;
 
   if ((tmp = malloc(sizeof(*tmp) * 2 * r * BLOCK_WORDS * (N + 2))) == NULL) {
     free(B);
@@ -203,7 +204,8 @@ scrypt (const void *password, size_t passwordLen, const void *salt, size_t saltL
     b += MFLen;
   }
 
-  PBKDF2_SHA256(password, passwordLen, B, p * MFLen, 1, derivedKey, dkLen);
+  if (PBKDF2_SHA256(password, passwordLen, B, p * MFLen, 1, derivedKey, dkLen))
+    return -1;
 
   free(tmp);
   free(B);

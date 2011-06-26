@@ -9,6 +9,8 @@
 #  include <stdint.h>
 # endif
 #endif
+
+#include <errno.h>
 #include <string.h>
 
 #define _PBKDF2_INTERNAL
