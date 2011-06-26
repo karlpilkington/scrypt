@@ -16,11 +16,24 @@
 #include "scrypt.h"
 #include "pbkdf2-sha256.h"
 
-#define ROTL(x, n) (((x) << (n)) | ((x) >> (32 - (n))))
-#define ROTR(x, n) (((x) >> (n)) | ((x) << (32 - (n))))
+static inline uint32_t
+ROTL(uint32_t x, int n)
+{
+  return (x << n) | (x >> (32 - n));
+}
 
-#define BYTESWAP(x) ((ROTR((x), 8) & 0xff00ff00) | \
-                     (ROTL((x), 8) & 0x00ff00ff))
+static inline uint32_t
+ROTR(uint32_t x, int n)
+{
+  return (x >> n) | (x << (32 - n));
+}
+
+static inline uint32_t
+BYTESWAP(uint32_t x)
+{
+  return (ROTR(x, 8) & 0xff00ff00) |
+    (ROTL(x, 8) & 0x00ff00ff);
+}
 
 #define BLOCK_WORDS 16
 
@@ -76,7 +89,8 @@ salsa20_8_core (uint32_t out[BLOCK_WORDS], const uint32_t in[BLOCK_WORDS])
 }
 
 static void
-blockmix_salsa20_8_core (uint32_t *out, const uint32_t *in, int r)
+blockmix_salsa20_8_core (uint32_t out[/* (2 * r * BLOCK_WORDS) */],
+			 const uint32_t in[/* (2 * r * BLOCK_WORDS) */], int r)
 {
   uint32_t *even, *odd;
   uint32_t *x;
@@ -107,28 +121,27 @@ blockmix_salsa20_8_core (uint32_t *out, const uint32_t *in, int r)
   }
 }
 
-static int
-smix (void *out, const void *in, int N, int r)
+static void
+smix (void *out /* (sizeof(uint32_t) * 2 * r * BLOCK_WORDS) */,
+      const void *in /* (sizeof(uint32_t) * 2 * r * BLOCK_WORDS) */, int N, int r,
+      uint32_t tmp[/* (2 * r * BLOCK_WORDS * (N + 2)) */])
 {
-  uint32_t *V, *v;
+  uint32_t *v;
   uint32_t *X, *T, *x, *t;
   uint32_t j;
   int i, k;
 
-  if ((V = malloc(sizeof(*V) * 2 * r * BLOCK_WORDS * (N + 2))) == NULL) /* NB: N + 2 */
-    return -1;
-
-  memcpy(V, in, sizeof(*V) * 2 * r * BLOCK_WORDS);
+  memcpy(tmp, in, sizeof(*tmp) * 2 * r * BLOCK_WORDS);
 
 #ifdef WORDS_BIGENDIAN
-  v = V;
+  v = tmp;
   for (i = 2 * r * BLOCK_WORDS - 1; i >= 0; i--) {
     *v = BYTESWAP(*v);
     v++;
   }
 #endif /* WORDS_BIGENDIAN */
 
-  v = V;
+  v = tmp;
   for (i = N - 1; i >= 0; i--) {
     blockmix_salsa20_8_core(v + 2 * r * BLOCK_WORDS, v, r);
     v += 2 * r * BLOCK_WORDS;
@@ -140,7 +153,7 @@ smix (void *out, const void *in, int N, int r)
     j = X[(2 * r - 1) * BLOCK_WORDS] % N;
 
     x = X;
-    v = &V[2 * r * BLOCK_WORDS * j];
+    v = &tmp[2 * r * BLOCK_WORDS * j];
     for (k = 2 * r * BLOCK_WORDS - 1; k >= 0; k--) {
       *(x++) ^= *(v++);
     }
@@ -162,9 +175,6 @@ smix (void *out, const void *in, int N, int r)
 #endif /* WORDS_BIGENDIAN */
 
   memcpy (out, X, sizeof(*X) * 2 * r * BLOCK_WORDS);
-
-  free(V);
-  return 0;
 }
 
 int
@@ -173,27 +183,30 @@ scrypt (const void *password, size_t passwordLen, const void *salt, size_t saltL
 {
   int MFLen = sizeof(uint32_t) * 2 * r * BLOCK_WORDS;
   uint8_t *B, *b;
+  uint32_t *tmp;
   int i;
-  int success = -1;
 
   if ((B = malloc(p * MFLen)) == NULL)
     return -1;
 
   PBKDF2_SHA256(password, passwordLen, salt, saltLen, 1, B, p * MFLen);
 
+  if ((tmp = malloc(sizeof(*tmp) * 2 * r * BLOCK_WORDS * (N + 2))) == NULL) {
+    free(B);
+    return -1;
+  }
+
   b = B;
   for (i = p - 1; i >= 0; i--) {
-    if (smix(b, b, N, r)) goto out;
+    smix(b, b, N, r, tmp);
     b += MFLen;
   }
 
   PBKDF2_SHA256(password, passwordLen, B, p * MFLen, 1, derivedKey, dkLen);
 
-  success = 0;
-
- out:
+  free(tmp);
   free(B);
-  return success;
+  return 0;
 }
 
 #ifdef SCRYPT_TEST
@@ -216,42 +229,21 @@ print_hex (uint8_t *s, int len)
 int
 main (int argc, char *argv[])
 {
-  uint32_t salsain[BLOCK_WORDS], salsaout[BLOCK_WORDS];
-  uint32_t blockmixin[4 * BLOCK_WORDS], blockmixout[4 * BLOCK_WORDS];
-  uint32_t smixin[2 * BLOCK_WORDS], smixout[2 * BLOCK_WORDS];
   uint8_t out[64];
 
-  memset(salsain, 0, sizeof(salsain));
-  salsain[0] = 1;
-  salsa20_8_core(salsaout, salsain);
-  printf("salsa20_8_core:\n");
-  print_hex((uint8_t *)salsaout, sizeof(salsaout));
-
-  memset(blockmixin, 0, sizeof(blockmixin));
-  blockmixin[0] = 1;
-  blockmix_salsa20_8_core(blockmixout, blockmixin, 2);
-  printf("blockmix_salsa20_8_core:\n");
-  print_hex((uint8_t *)blockmixout, sizeof(blockmixout));
-
-  memset(smixin, 0, sizeof(smixin));
-  smixin[0] = 1;
-  smix(smixout, smixin, 1, 1);
-  printf("smix:\n");
-  print_hex((uint8_t *)smixout, sizeof(smixout));
-
-  printf("scrypt:\n");
+  printf("scrypt #1:\n");
   scrypt("", 0, "", 0, 16, 1, 1, out, sizeof(out));
   print_hex(out, sizeof(out));
 
-  printf("scrypt:\n");
+  printf("scrypt #2:\n");
   scrypt("password", 8, "NaCl", 4, 1024, 8, 16, out, sizeof(out));
   print_hex(out, sizeof(out));
 
-  printf("scrypt:\n");
+  printf("scrypt #3:\n");
   scrypt("pleaseletmein", 13, "SodiumChloride", 14, 16384, 8, 1, out, sizeof(out));
   print_hex(out, sizeof(out));
 
-  printf("scrypt:\n");
+  printf("scrypt #4:\n");
   scrypt("pleaseletmein", 13, "SodiumChloride", 14, 1048576, 8, 1, out, sizeof(out));
   print_hex(out, sizeof(out));
 
