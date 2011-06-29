@@ -24,9 +24,6 @@
  * SUCH DAMAGE.
  */
 
-#ifndef _APS_SCRYPT_H
-#define _APS_SCRYPT_H
-
 #ifdef HAVE_CONFIG_H
 #include <config.h>
 #endif /* HAVE_CONFIG_H */
@@ -39,9 +36,18 @@
 # endif
 #endif
 
-int scrypt (const void *password, size_t passwordLen,
-	    const void *salt, size_t saltLen,
-	    unsigned int N, unsigned int r, unsigned int p,
-	    uint8_t *derivedKey, size_t dkLen);
+#include <errno.h>
+#include <string.h>
 
-#endif /* !_APS_SCRYPT_H */
+#define _PBKDF2_INTERNAL
+#include "pbkdf2-hmac-sha256.h"
+
+#include "hmac-sha256.h"
+
+#define HMAC_CONTEXT HMAC_SHA256_Context
+#define HMAC_INIT HMAC_SHA256_Init
+#define HMAC_UPDATE HMAC_SHA256_Update
+#define HMAC_FINAL HMAC_SHA256_Final
+#define HMAC_SIZE SHA256_HASH_SIZE
+
+#include "_pbkdf2.c"

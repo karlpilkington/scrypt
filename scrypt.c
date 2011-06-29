@@ -1,3 +1,29 @@
+/*-
+ * Copyright (c) 2011 Allan Saddi <allan@saddi.com>
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ */
+
 #ifdef HAVE_CONFIG_H
 #include <config.h>
 #endif /* HAVE_CONFIG_H */
@@ -14,7 +40,9 @@
 #include <string.h>
 
 #include "scrypt.h"
-#include "pbkdf2-sha256.h"
+#include "pbkdf2-hmac-sha256.h"
+
+#define BLOCK_WORDS 16
 
 static inline uint32_t
 ROTL(uint32_t x, int n)
@@ -34,8 +62,6 @@ BYTESWAP(uint32_t x)
   return (ROTR(x, 8) & 0xff00ff00) |
     (ROTL(x, 8) & 0x00ff00ff);
 }
-
-#define BLOCK_WORDS 16
 
 static void
 salsa20_8_core (uint32_t out[BLOCK_WORDS], const uint32_t in[BLOCK_WORDS])
@@ -90,7 +116,8 @@ salsa20_8_core (uint32_t out[BLOCK_WORDS], const uint32_t in[BLOCK_WORDS])
 
 static void
 blockmix_salsa20_8_core (uint32_t out[/* (2 * r * BLOCK_WORDS) */],
-			 const uint32_t in[/* (2 * r * BLOCK_WORDS) */], unsigned int r)
+			 const uint32_t in[/* (2 * r * BLOCK_WORDS) */],
+			 unsigned int r)
 {
   uint32_t *even, *odd;
   uint32_t *x;
@@ -123,7 +150,8 @@ blockmix_salsa20_8_core (uint32_t out[/* (2 * r * BLOCK_WORDS) */],
 
 static void
 smix (void *out /* (sizeof(uint32_t) * 2 * r * BLOCK_WORDS) */,
-      const void *in /* (sizeof(uint32_t) * 2 * r * BLOCK_WORDS) */, unsigned int N, unsigned int r,
+      const void *in /* (sizeof(uint32_t) * 2 * r * BLOCK_WORDS) */,
+      unsigned int N, unsigned int r,
       uint32_t tmp[/* (2 * r * BLOCK_WORDS * (N + 2)) */])
 {
   uint32_t *v;
@@ -178,7 +206,8 @@ smix (void *out /* (sizeof(uint32_t) * 2 * r * BLOCK_WORDS) */,
 }
 
 int
-scrypt (const void *password, size_t passwordLen, const void *salt, size_t saltLen,
+scrypt (const void *password, size_t passwordLen,
+	const void *salt, size_t saltLen,
 	unsigned int N, unsigned int r, unsigned int p,
 	uint8_t *derivedKey, size_t dkLen)
 {
@@ -190,7 +219,8 @@ scrypt (const void *password, size_t passwordLen, const void *salt, size_t saltL
   if ((B = malloc(p * MFLen)) == NULL)
     return -1;
 
-  if (PBKDF2_SHA256(password, passwordLen, salt, saltLen, 1, B, p * MFLen))
+  if (PBKDF2_HMAC_SHA256(password, passwordLen, salt, saltLen, 1,
+			 B, p * MFLen))
     return -1;
 
   if ((tmp = malloc(sizeof(*tmp) * 2 * r * BLOCK_WORDS * (N + 2))) == NULL) {
@@ -204,7 +234,8 @@ scrypt (const void *password, size_t passwordLen, const void *salt, size_t saltL
     b += MFLen;
   }
 
-  if (PBKDF2_SHA256(password, passwordLen, B, p * MFLen, 1, derivedKey, dkLen))
+  if (PBKDF2_HMAC_SHA256(password, passwordLen, B, p * MFLen, 1,
+			 derivedKey, dkLen))
     return -1;
 
   free(tmp);
@@ -217,12 +248,12 @@ scrypt (const void *password, size_t passwordLen, const void *salt, size_t saltL
 #include <stdio.h>
 
 static void
-print_hex (uint8_t *s, int len)
+print_hex (const void *buf, size_t len)
 {
-  int i;
+  unsigned int i;
 
   for (i = 0; i < len;) {
-    printf ("%02x", s[i++]);
+    printf ("%02x", ((uint8_t *)buf)[i++]);
     if (!(i % 4)) printf (" ");
     if (!(i % 32)) printf ("\n");
   }
